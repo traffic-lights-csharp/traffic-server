@@ -5,20 +5,21 @@ namespace trafficserver
 {
 	public class Client
 	{
-		private Thread _networkThread;
+		private Thread _networkMonitorThread;
 		private Mutex _localMutex;
 
 		public Client()
 		{
 			this._localMutex = new Mutex();
 
-			this._networkThread = new Thread(this.NetworkThread);
-			this._networkThread.Start();
+			this._networkMonitorThread = new Thread(this.NetworkMonitor);
+			this._networkMonitorThread.Start();
 		}
 
-		public void NetworkThread()
+		public void NetworkMonitor()
 		{
-			for (int i = 0; i < 10; i ++)
+			// Add 4 test clients
+			for (int i = 0; i < 4; i ++)
 			{
 				Thread.Sleep(1);
 				Console.WriteLine("Message from client thread");
