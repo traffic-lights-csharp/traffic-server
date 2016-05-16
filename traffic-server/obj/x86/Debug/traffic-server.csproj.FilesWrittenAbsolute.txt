@@ -1,0 +1,5 @@
+/media/master-storage/Documents/Education/University/Assignments/NET103/traffic-lights/traffic-server/traffic-server/obj/x86/Debug/.NETFramework,Version=v4.5.AssemblyAttribute.cs
+/media/master-storage/Documents/Education/University/Assignments/NET103/traffic-lights/traffic-server/traffic-server/bin/Debug/traffic-server.exe.mdb
+/media/master-storage/Documents/Education/University/Assignments/NET103/traffic-lights/traffic-server/traffic-server/bin/Debug/traffic-server.exe
+/media/master-storage/Documents/Education/University/Assignments/NET103/traffic-lights/traffic-server/traffic-server/obj/x86/Debug/traffic-server.exe
+/media/master-storage/Documents/Education/University/Assignments/NET103/traffic-lights/traffic-server/traffic-server/obj/x86/Debug/traffic-server.exe.mdb
