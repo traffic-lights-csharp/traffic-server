@@ -1,28 +1,42 @@
 ﻿using System;
 using System.Threading;
+using System.Net.Sockets;
 
 namespace trafficserver
 {
 	public class Client
 	{
 		private Thread _networkMonitorThread;
-		private Mutex _localMutex;
+		private NetworkStream _netStream;
 
-		public Client()
+		private int _id;
+
+		public Client(int id, NetworkStream netStream)
 		{
-			this._localMutex = new Mutex();
+			this._id = id;
+
+			this._netStream = netStream;
 
 			this._networkMonitorThread = new Thread(this.NetworkMonitor);
 			this._networkMonitorThread.Start();
 		}
 
+		public void Terminate()
+		{
+			this._networkMonitorThread.Abort();
+			this._netStream.Close();
+		}
+
 		public void NetworkMonitor()
 		{
-			// Add 4 test clients
-			for (int i = 0; i < 4; i ++)
+			while (true)
 			{
-				Thread.Sleep(1);
-				Console.WriteLine("Message from client thread");
+				int result = -1;
+				while (result == -1)
+					result = this._netStream.ReadByte();
+
+				byte incomingByte = (byte)result;
+				Console.WriteLine("Got byte from client {0}! {1}", this._id, incomingByte);
 			}
 		}
 	}
