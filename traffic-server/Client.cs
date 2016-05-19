@@ -1,13 +1,15 @@
 ﻿using System;
 using System.Threading;
 using System.Net.Sockets;
+using System.Text;
+using System.Collections.Generic;
 
 namespace trafficserver
 {
 	public class Client
 	{
 		private Thread _networkMonitorThread;
-		private NetworkStream _netStream;
+		private NetworkStream _networkStream;
 
 		private int _id;
 
@@ -15,7 +17,7 @@ namespace trafficserver
 		{
 			this._id = id;
 
-			this._netStream = netStream;
+			this._networkStream = netStream;
 
 			this._networkMonitorThread = new Thread(this.NetworkMonitor);
 			this._networkMonitorThread.Start();
@@ -24,20 +26,36 @@ namespace trafficserver
 		public void Terminate()
 		{
 			this._networkMonitorThread.Abort();
-			this._netStream.Close();
+			this._networkStream.Close();
 		}
 
 		public void NetworkMonitor()
 		{
+			// TODO : Make this neater
 			while (true)
 			{
-				int result = -1;
-				while (result == -1)
-					result = this._netStream.ReadByte();
+				byte[] packet = this.GetBytePacket(this._networkStream);
 
-				byte incomingByte = (byte)result;
-				Console.WriteLine("Got byte from client {0}! {1}", this._id, incomingByte);
+				StringBuilder builder = new StringBuilder();
+				foreach (byte b in packet)
+					builder.Append((char)b);
+
+				Console.WriteLine("Got message from client {0} : {1}", this._id, builder.ToString());
 			}
+		}
+
+		public byte[] GetBytePacket(NetworkStream stream)
+		{
+			List<byte> tmpList = new List<byte>();
+
+			int readByte = 0x00;
+			while ((readByte = stream.ReadByte()) == -1) { };
+			tmpList.Add((byte)readByte);
+
+			while ((readByte = stream.ReadByte()) != 4)
+				tmpList.Add((byte)readByte);
+
+			return tmpList.ToArray();
 		}
 	}
 }
