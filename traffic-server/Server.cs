@@ -99,6 +99,7 @@ namespace trafficserver
 				//We've got an incoming connection. Spawn a client with a unique id
 				int id = this.GetUniqueClientId();
 				this._clients.Add(new Client(this, id, new NetworkStream(incomingSoc)));
+				this.UpdateClient(this._clients[this._clients.Count - 1]);
 
 				Console.WriteLine("Detected incoming connection, generated client monitor with id {0}", id);
 			}
