@@ -8,13 +8,18 @@ namespace trafficserver
 {
 	public class Client
 	{
+		private Server _parent;
+
 		private Thread _networkMonitorThread;
 		private NetworkStream _networkStream;
 
+		private bool _deleteLater = false;
+
 		private int _id;
 
-		public Client(int id, NetworkStream netStream)
+		public Client(Server parent, int id, NetworkStream netStream)
 		{
+			this._parent = parent;
 			this._id = id;
 
 			this._networkStream = netStream;
@@ -34,28 +39,121 @@ namespace trafficserver
 			// TODO : Make this neater
 			while (true)
 			{
-				byte[] packet = this.GetBytePacket(this._networkStream);
+				// Make sure we're still connected
+				if (!this._networkStream.CanWrite)
+					this.Close();
 
-				StringBuilder builder = new StringBuilder();
-				foreach (byte b in packet)
-					builder.Append((char)b);
+				string packet = "invalid";
+				try
+				{
+					packet = this.ReceiveString();
+				}
+				catch (Exception expect)
+				{
+					Console.WriteLine("Error when receiving from client {0}: {1}", this._id, expect.Message);
+					this.Close();
+				}
 
-				Console.WriteLine("Got message from client {0} : {1}", this._id, builder.ToString());
+				Console.WriteLine("Got message from client {0} : {1}", this._id, packet);
+
+				this._parent.TrafficDataMutex.WaitOne(); // Critical code below!
+				if (!this.HandleMessage(packet))
+					Console.WriteLine("Failed to properly handle message");
+				this._parent.TrafficDataMutex.ReleaseMutex();
 			}
 		}
 
-		public byte[] GetBytePacket(NetworkStream stream)
+		public void Close()
+		{
+			if (this._deleteLater)
+				return;
+
+			this._networkMonitorThread.Abort();
+			this._networkStream.Close();
+			this._deleteLater = true;
+
+			Console.WriteLine("Removed client {0}", this._id);
+		}
+
+		public bool HandleMessage(string message)
+		{
+			string[] components = message.Split(',');
+
+			if (components.Length <= 0)
+				return false;
+
+			switch (components [0])
+			{
+			case "add-car":
+				{
+					if (components.Length != 2)
+						return false;
+
+					this._parent.TrafficData.CarsWaiting += Convert.ToInt32(components[1]);
+					this._parent.TrafficData.EditTrigger = true; // Needs an update!
+
+					return true;
+				}
+				break;
+
+			default:
+				return false;
+			}
+
+			return false;
+		}
+
+		public bool SendString(string message)
+		{
+			if (!this._networkStream.CanWrite)
+			{
+				Console.WriteLine("Cannot write to client {0}");
+				this.Close();
+				return false;
+			}
+
+			List<byte> packet = new List<byte>();
+
+			foreach (char c in message)
+				packet.Add((byte)c);
+
+			packet.Add(4); // EoT delimiter
+
+			try
+			{
+				this._networkStream.Write(packet.ToArray(), 0, packet.ToArray().Length);
+			}
+			catch (Exception except)
+			{
+				Console.WriteLine("Error sending message to client {0}: {1}", this._id, except.Message);
+				this.Close();
+				return false;
+			}
+
+			return true;
+		}
+
+		public string ReceiveString()
 		{
 			List<byte> tmpList = new List<byte>();
 
 			int readByte = 0x00;
-			while ((readByte = stream.ReadByte()) == -1) { };
+			while ((readByte = this._networkStream.ReadByte()) == -1) { };
 			tmpList.Add((byte)readByte);
 
-			while ((readByte = stream.ReadByte()) != 4)
+			while ((readByte = this._networkStream.ReadByte()) != 4)
 				tmpList.Add((byte)readByte);
 
-			return tmpList.ToArray();
+			string builder = "";
+			foreach (byte b in tmpList.ToArray())
+				builder += (char)b;
+
+			return builder;
+		}
+
+		public bool DeleteLater
+		{
+			get { return this._deleteLater; }
 		}
 	}
 }

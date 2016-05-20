@@ -13,6 +13,9 @@ namespace trafficserver
 
 		List<Client> _clients;
 
+		private TrafficData _trafficData;
+		private Mutex _trafficDataMutex;
+
 		private Thread _networkListenerThread;
 		private TcpListener _networkListener;
 
@@ -23,6 +26,9 @@ namespace trafficserver
 
 		public Server()
 		{
+			this._trafficData = new TrafficData();
+			this._trafficDataMutex = new Mutex();
+
 			this._clients = new List<Client>();
 
 			this._networkListenerThread = new Thread(this.NetworkListener);
@@ -40,7 +46,44 @@ namespace trafficserver
 		{
 			while (this._running)
 			{
-				// Do nothing yet
+				Thread.Sleep(100); // Give other threads a chance to do stuff
+
+				this._trafficDataMutex.WaitOne(); // Critical code below!
+
+				if (this._trafficData.CarsWaiting > 0 && this._trafficData.LightColour == 2)
+				{
+					this._trafficData.LightColour = 0;
+				}
+				
+				if (this._trafficData.CarsWaiting >= 10 && this._trafficData.LightColour == 0)
+				{
+					this._trafficData.LightColour = 2;
+					this._trafficData.CarsWaiting = 0;
+					this._trafficData.EditTrigger = true;
+				}
+
+				if (this._trafficData.EditTrigger) // Do we need to update the clients on changed information?
+				{
+					Console.WriteLine("Data edit detected. Updating clients...");
+
+					// Remove all clients that need to be removed
+					for (int i = 0; i < this._clients.Count;)
+					{
+						if (this._clients[i].DeleteLater)
+							this._clients.RemoveAt(i);
+						else
+							i++;
+					}
+
+					foreach (Client client in this._clients)
+					{
+						this.UpdateClient(client);
+					}
+
+					this._trafficData.EditTrigger = false;
+				}
+
+				this._trafficDataMutex.ReleaseMutex();
 			};
 		}
 
@@ -55,7 +98,7 @@ namespace trafficserver
 
 				//We've got an incoming connection. Spawn a client with a unique id
 				int id = this.GetUniqueClientId();
-				this._clients.Add(new Client(id, new NetworkStream(incomingSoc)));
+				this._clients.Add(new Client(this, id, new NetworkStream(incomingSoc)));
 
 				Console.WriteLine("Detected incoming connection, generated client monitor with id {0}", id);
 			}
@@ -68,6 +111,23 @@ namespace trafficserver
 			this._uniqueClientIdMutex.ReleaseMutex();
 
 			return this._uniqueClientId - 1;
+		}
+
+		public void UpdateClient(Client client)
+		{
+			// Send traffic data
+			client.SendString("update-car-count," + Convert.ToInt32(this._trafficData.CarsWaiting));
+			client.SendString("update-light-colour," + Convert.ToInt32(this._trafficData.LightColour));
+		}
+
+		public TrafficData TrafficData
+		{
+			get { return this._trafficData; }
+		}
+
+		public Mutex TrafficDataMutex
+		{
+			get { return this._trafficDataMutex; }
 		}
 	}
 }
